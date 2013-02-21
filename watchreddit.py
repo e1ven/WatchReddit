@@ -11,16 +11,23 @@ import urllib.error
 import time
 from smtplib import SMTP_SSL as SMTP   
 from email.mime.text import MIMEText
-
+import string
+import random
 
 class RedditScraper:
     def __init__(self):
         self.subreddits = set()
-        self.headers =  {'User-agent':'Reddit Comment Watcher test by /u/e1ven; Version forked from Github'}
+        self.headers =  {'User-agent':'Reddit Comment Watcher test by /u/e1ven - Github forked version'}
         self.nextcheck = {}
         self.nextglobal = 0
         self.interestingwords = ['reddit','tavern']
         self.commentswithtext = {}
+
+        # Generate a random breakstring, so having this on Github won't open me to floods.
+        self.breakstring = "ALREADY-SENT-" 
+        for i in range(0,12):
+            self.breakstring += random.choice(string.ascii_lowercase)
+        print("Using Breakstring -- " + self.breakstring)
 
     def MakeJSONReq(self,url):
 
@@ -90,13 +97,13 @@ class RedditScraper:
                         self.commentswithtext[permalink] = body
 
     def SendMail(self):
-        USERNAME = "you@gmail.com"
+        USERNAME = "You@YourEmail.com"
         PASSWORD = "YOURPASSWORD"
-        SMTPserver = 'smtp.YOURSERVER.com'
+        SMTPserver = 'smtp.YOURMAIL.com'
 
         for permalink in self.commentswithtext:
             body = self.commentswithtext[permalink]
-            if body[:12] !=  "ALREADY-SENT":
+            if body[:len(self.breakstring)] != self.breakstring:
                 content = "FYI - " + permalink + """
                 """ + self.commentswithtext[permalink] + """
 
@@ -106,7 +113,7 @@ class RedditScraper:
                 text_subtype = 'plain'
                 msg = MIMEText(content, text_subtype)
                 msg['Subject']=  "New Reddit Comment"
-                msg['From']   = "YOUREMAIL" 
+                msg['From']   = "you@example.com" 
 
                 conn = SMTP(SMTPserver)
                 conn.set_debuglevel(False)
@@ -118,9 +125,9 @@ class RedditScraper:
                     conn.close()     
 
                 # Mark that we've now sent this message      
-                self.commentswithtext[permalink] = "ALREADY-SENT" + str(   int(time.time())   ) 
+                self.commentswithtext[permalink] = self.breakstring + str(   int(time.time())   ) 
             else:
-                timestamp = int(body[12:])
+                timestamp = int(body[len(self.breakstring):])
                 # If this entry was added > 5 mins ago, remove it.
                 if timestamp + 300 < int(time.time()):
                     del self.commentswithtext[permalink]
