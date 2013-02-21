@@ -113,7 +113,7 @@ class RedditScraper:
                 conn.login(USERNAME, PASSWORD)
                 try:
                     print("Sending Mail -- " + permalink)
-                    conn.sendmail("YOU@YOUREMAIL.com", msg.as_string())
+                    conn.sendmail(msg['From'],msg['From'], msg.as_string())
                 finally:
                     conn.close()     
 
