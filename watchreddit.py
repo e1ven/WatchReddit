@@ -13,6 +13,8 @@ from smtplib import SMTP_SSL as SMTP
 from email.mime.text import MIMEText
 import string
 import random
+import unicodedata
+
 
 class RedditScraper:
     def __init__(self):
@@ -42,9 +44,11 @@ class RedditScraper:
         # also set these waits at the end, so that if Reddit counts from competion, we're still on their good side.
         self.nextcheck[url] = time.time() + 30
         self.nextglobal = time.time() + 2
+        req = urllib.request.Request(headers=self.headers,url=url)
+
 
         try:
-            f = urllib.request.urlopen(url)
+            f = urllib.request.urlopen(req)
             if f.getcode() == 200:
                 # If we get a valid reply from Reddit, try to read it.
                 response = f.read().decode('utf-8')
@@ -53,8 +57,8 @@ class RedditScraper:
                 return respjson
             else:
                 return None
-        except:
-            print("Error pulling from Reddit")
+        except Exception as e:
+            print('Error Pulling from Reddit --' + str(e) )
 
         finally:
             self.nextcheck[url] = time.time() + 30
@@ -109,11 +113,11 @@ class RedditScraper:
 
                 Thanks!
                 """
-                content.encode('ascii', 'ignore')
+                content = content.encode('utf-8')
                 text_subtype = 'plain'
-                msg = MIMEText(content, text_subtype)
+                msg = MIMEText(content,'plain','utf-8')
                 msg['Subject']=  "New Reddit Comment"
-                msg['From']   = "you@example.com" 
+                msg['From']   = "you@yourmail.com" 
 
                 conn = SMTP(SMTPserver)
                 conn.set_debuglevel(False)
@@ -125,20 +129,31 @@ class RedditScraper:
                     conn.close()     
 
                 # Mark that we've now sent this message      
-                self.commentswithtext[permalink] = self.breakstring + str(   int(time.time())   ) 
-            else:
-                timestamp = int(body[len(self.breakstring):])
-                # If this entry was added > 5 mins ago, remove it.
-                if timestamp + 300 < int(time.time()):
-                    del self.commentswithtext[permalink]
-                    print("Removed old link - " + permalink)
+                self.commentswithtext[permalink] = self.breakstring + str(   int(time.time())   )
 
+    def CleanUp(self):
+        # Cleanup old entries
+        tmplist = []
 
+        for permalink in self.commentswithtext:
+            body = self.commentswithtext[permalink]
+            timestamp = int(body[len(self.breakstring):])
+            # If this entry was added > 5 mins ago, remove it.
+            # We can't just del it here, since we're IN the loop.
+            # Add it to a temp array, and remove after iteration.
+
+            if timestamp + 300 < int(time.time()):
+                tmplist.append(permalink)
+
+        for permalink in tmplist:
+            del self.commentswithtext[permalink]
+            print("Removed old link - " + permalink)
 
 r = RedditScraper()
 #r.UpdateSubredditList()
 while(1):
     r.CheckCommentsInSubreddit(subreddit='all')
     r.SendMail()
+    r.CleanUp()
 
 
